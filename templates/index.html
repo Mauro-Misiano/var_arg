@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Riesgo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <h1 class="mb-4">📈 Monitor de Riesgo de Cartera</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="csvFile" class="form-label">Subí tu cartera (CSV con columnas Activo, Peso)</label>
+                <input class="form-control" type="file" id="csvFile" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Procesar</button>
+        </form>
+        <div id="output" class="mt-5" style="display:none;">
+            <h4>Resultados</h4>
+            <div id="metrics"></div>
+            <div id="chart" style="height: 400px;"></div>
+        </div>
+    </div>
+    <script>
+        document.getElementById("uploadForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById("csvFile");
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await fetch("/analyze", {
+                method: "POST",
+                body: formData
+            });
+            const result = await response.json();
+
+            document.getElementById("output").style.display = "block";
+            document.getElementById("metrics").innerHTML = `
+                <p><strong>VaR 95% (1 día):</strong> ${result.var95.toFixed(2)}%</p>
+                <p><strong>CVaR 95% (1 día):</strong> ${result.cvar95.toFixed(2)}%</p>
+            `;
+            Plotly.newPlot("chart", [
+                {
+                    x: [...Array(result.capital.length).keys()],
+                    y: result.capital,
+                    type: "scatter",
+                    name: "Simulación",
+                    line: { color: "green" }
+                },
+                {
+                    x: [...Array(result.capital.length).keys()],
+                    y: result.upper,
+                    line: { width: 0 },
+                    type: "scatter",
+                    name: "IC 95%",
+                    showlegend: false
+                },
+                {
+                    x: [...Array(result.capital.length).keys()],
+                    y: result.lower,
+                    fill: "tonexty",
+                    fillcolor: "rgba(0, 255, 0, 0.1)",
+                    line: { width: 0 },
+                    type: "scatter",
+                    name: "IC 95%",
+                    showlegend: false
+                }
+            ], {
+                margin: { t: 10 }
+            });
+        });
+    </script>
+</body>
+</html>
